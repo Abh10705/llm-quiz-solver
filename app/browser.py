@@ -51,10 +51,10 @@ class QuizBrowser:
         
         try:
             # Navigate to the URL and wait for content to load
-            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await page.goto(url, wait_until="networkidle", timeout=15000)
             
             # Wait a bit for JavaScript to execute
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(500)
             
             # Get the rendered content
             content = await page.content()
