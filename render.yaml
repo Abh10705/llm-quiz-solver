@@ -2,10 +2,16 @@ services:
   - type: web
     name: llm-quiz-solver
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt && playwright install chromium && playwright install-deps chromium"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: SECRET_STRING
         sync: false
       - key: EMAIL
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright

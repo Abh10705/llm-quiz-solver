@@ -117,7 +117,7 @@ async def solve_quiz(request: Request):
         
             logger.info("Using CSV analysis solver")
             answer = await quiz_solver.solve_with_csv_analysis(
-                quiz_data['question'], 
+                quiz_data, 
                 analysis, 
                 quiz_browser
             )

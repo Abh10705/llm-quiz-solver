@@ -178,32 +178,32 @@ Extract ONLY the answer value. Respond with JSON containing a single field "answ
             logger.error(f"Error during web scraping: {e}")
             raise
 
-    async def solve_with_csv_analysis(self, quiz_text: str, analysis: Dict[str, Any], browser) -> Any:
+    async def solve_with_csv_analysis(self, quiz_data: Dict[str, Any], analysis: Dict[str, Any], browser) -> Any:
         """Solve quiz that requires CSV data analysis"""
         logger.info("Quiz requires CSV analysis")
         
-        # Extract CSV URL from quiz text
+        # Extract text and HTML from quiz_data
+        quiz_text = quiz_data['question']
+        quiz_html = quiz_data.get('html', quiz_text)
+        
+        # Extract CSV URL from HTML
         csv_url = None
         
         # Try 1: Look for href="...csv" in HTML
-        href_match = re.search(r'href\s*=\s*["\']([^"\']*\.csv[^"\']*)["\']', quiz_text, re.IGNORECASE)
+        href_match = re.search(r'href\s*=\s*["\']([^"\']*\.csv[^"\']*)["\']', quiz_html, re.IGNORECASE)
         if href_match:
             csv_file = href_match.group(1)
             logger.info(f"Found CSV file reference: {csv_file}")
             
             # Build full URL if it's relative
             if not csv_file.startswith('http'):
-                base_match = re.search(r'https?://[^/\s]+', quiz_text)
-                if base_match:
-                    base_url = base_match.group(0)
-                    csv_url = base_url + '/' + csv_file.lstrip('/')
-                else:
-                    csv_url = 'https://tds-llm-analysis.s-anand.net/' + csv_file.lstrip('/')
+                base_url = "https://tds-llm-analysis.s-anand.net"
+                csv_url = base_url + '/' + csv_file.lstrip('/')
             else:
                 csv_url = csv_file
             logger.info(f"Built full CSV URL: {csv_url}")
         
-        # Try 2: Look for direct CSV URLs
+        # Try 2: Look for direct CSV URLs in text
         if not csv_url:
             urls = re.findall(r'https?://[^\s\]<>"\']+\.csv', quiz_text)
             if urls:
@@ -219,54 +219,22 @@ Extract ONLY the answer value. Respond with JSON containing a single field "answ
         csv_text = csv_data.decode('utf-8')
         logger.info(f"Downloaded CSV, first 200 chars: {csv_text[:200]}")
         
-        # Ask LLM what analysis to do
-        prompt = f"""Analyze this quiz and tell me what calculation to perform on the CSV data.
-
-Quiz:
-{quiz_text}
-
-CSV preview:
-{csv_text[:500]}
-
-Respond with JSON containing:
-1. "analysis_type": What to do? (count_above, count_below, sum, average, etc.)
-2. "cutoff_value": The threshold value (if applicable)
-3. "instructions": Clear instructions on what to calculate
-
-Respond ONLY with valid JSON."""
-
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are a data analysis expert."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0,
-            response_format={"type": "json_object"}
-        )
-        
-        analysis_result = json.loads(response.choices[0].message.content)
-        logger.info(f"Analysis result: {analysis_result}")
-        
         # Parse CSV and perform calculation
         lines = csv_text.strip().split('\n')
         numbers = [int(line.strip()) for line in lines if line.strip().isdigit()]
         logger.info(f"Parsed {len(numbers)} numbers from CSV")
         
-        # Perform the analysis
-        if analysis_result['analysis_type'] == 'count_above':
-            cutoff = int(analysis_result['cutoff_value'])
-            answer = len([n for n in numbers if n > cutoff])
-            logger.info(f"Count of numbers > {cutoff}: {answer}")
-        elif analysis_result['analysis_type'] == 'count_below':
-            cutoff = int(analysis_result['cutoff_value'])
-            answer = len([n for n in numbers if n < cutoff])
-            logger.info(f"Count of numbers < {cutoff}: {answer}")
-        elif analysis_result['analysis_type'] == 'sum':
-            answer = sum(numbers)
-            logger.info(f"Sum: {answer}")
+        # Check if quiz mentions cutoff - task is to sum numbers ABOVE cutoff
+        cutoff_match = re.search(r'cutoff[:\s]+(\d+)', quiz_text, re.IGNORECASE)
+        if cutoff_match:
+            cutoff = int(cutoff_match.group(1))
+            # Sum of numbers ABOVE cutoff (not count!)
+            answer = sum(n for n in numbers if n > cutoff)
+            logger.info(f"Sum of numbers > {cutoff}: {answer}")
         else:
-            answer = len(numbers)
+            # No cutoff mentioned, sum all numbers
+            answer = sum(numbers)
+            logger.info(f"Sum of all numbers: {answer}")
         
         return answer
 

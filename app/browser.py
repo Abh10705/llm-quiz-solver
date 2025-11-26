@@ -62,10 +62,12 @@ class QuizBrowser:
             # Try to extract text from #result first, fallback to body
             try:
                 result_text = await page.locator("#result").inner_text(timeout=5000)
+                result_html = await page.locator("#result").inner_html()
                 logger.info("Extracted content from #result element")
             except:
                 # Fallback: get all text from body
                 result_text = await page.locator("body").inner_text()
+                result_html = await page.locator("body").inner_html()
                 logger.info("Extracted content from body element")
             
             logger.info(f"Extracted quiz content (first 200 chars): {result_text[:200]}...")
@@ -75,6 +77,7 @@ class QuizBrowser:
             
             return {
                 "question": result_text,
+                "html": result_html,
                 "submit_url": submit_url,
                 "raw_html": content,
                 "quiz_url": url
