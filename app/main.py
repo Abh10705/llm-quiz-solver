@@ -6,6 +6,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 import httpx
+from app.solvers.pdf_solver import solve_pdf_analysis
 
 from app.browser import quiz_browser
 from app.llm import quiz_solver
@@ -112,6 +113,13 @@ async def solve_quiz(request: Request):
                 analysis, 
                 quiz_browser
             )
+        elif 'pdf' in quiz_data['question'].lower():
+            logger.info("Using PDF analysis solver")
+            answer = await solve_pdf_analysis(quiz_data, analysis, quiz_browser)
+
+        
+        
+        
         elif 'csv' in quiz_data['question'].lower() or 'cutoff' in quiz_data['question'].lower():
 
         
